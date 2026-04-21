@@ -236,15 +236,18 @@
 
     let results = [];
 
+
     // 2. Ищем по всей базе данных
     for (let colorName in giftData) {
         giftData[colorName].forEach(item => {
-            // Превращаем в нижний регистр для поиска
-            let title = (item.gift_title || "").toLowerCase();
-            let model = (item.name || "").toLowerCase();
+            // Очищаем названия от пробелов и дефисов для "мягкого" сравнения
+            let cleanSearch = searchName.replace(/[\s-]/g, '').toLowerCase();
+            
+            let title = (item.gift_title || "").replace(/[\s-]/g, '').toLowerCase();
+            let model = (item.name || "").replace(/[\s-]/g, '').toLowerCase();
 
-            // Проверяем совпадение либо с названием подарка, либо с моделью
-            if (title.includes(searchName) || model.includes(searchName)) {
+            // Сравниваем очищенные строки
+            if (title.includes(cleanSearch) || model.includes(cleanSearch)) {
                 results.push({ ...item, currentColor: colorName });
             }
         });
