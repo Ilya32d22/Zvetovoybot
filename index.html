@@ -225,9 +225,9 @@
 
     let searchName = "";
 
-    // 1. Парсим ввод: ссылка или просто текст
+    // 1. Извлекаем название из ссылки или берем текст
     if (input.includes('t.me/nft/')) {
-        // Из "https://t.me/nft/CloverPin-169271" достаем "cloverpin"
+        // Из "https://t.me/nft/EvilEye-5729" получаем "evileye"
         let lastPart = input.split('/').pop(); 
         searchName = lastPart.split('-')[0].toLowerCase(); 
     } else {
@@ -236,11 +236,15 @@
 
     let results = [];
 
-    // 2. Ищем по всей базе
+    // 2. Ищем по всей базе данных
     for (let colorName in giftData) {
         giftData[colorName].forEach(item => {
-            // У тебя в JSON "name": "Aetheris". Переводим в нижний регистр для сравнения.
-            if (item.name.toLowerCase() === searchName || item.name.toLowerCase().includes(searchName)) {
+            // Превращаем в нижний регистр для поиска
+            let title = (item.gift_title || "").toLowerCase();
+            let model = (item.name || "").toLowerCase();
+
+            // Проверяем совпадение либо с названием подарка, либо с моделью
+            if (title.includes(searchName) || model.includes(searchName)) {
                 results.push({ ...item, currentColor: colorName });
             }
         });
@@ -251,51 +255,48 @@
     const block = document.getElementById('analysis-result');
     
     if (results.length === 0) {
-        alert("Модель '" + searchName + "' не найдена в базе.");
+        alert("Подарок или модель '" + searchName + "' не найдены.");
         return;
     }
 
     block.style.display = 'block';
-    resultList.innerHTML = `<p style="font-size:12px; color:#888;">Найдено совпадений: ${results.length}</p>`;
+    resultList.innerHTML = `<p style="font-size: 12px; color: #888; margin-bottom: 10px;">Найдено совпадений: ${results.length}</p>`;
 
-    // Генерируем карточки для каждого найденного Phantom, Aetheris и т.д.
+    // Рисуем карточку для каждого найденного совпадения
     results.forEach(foundGift => {
         const targetRGB = parseRGB(colorMap[foundGift.currentColor]);
         let rankings = [];
 
-        // Считаем совместимость для конкретной находки
+        // Считаем совместимость с 80 цветами
         for (let name in colorMap) {
             const bgRGB = parseRGB(colorMap[name]);
             const dist = Math.sqrt(
-                Math.pow(targetRGB[0]-bgRGB[0], 2) + 
-                Math.pow(targetRGB[1]-bgRGB[1], 2) + 
-                Math.pow(targetRGB[2]-bgRGB[2], 2)
+                Math.pow(targetRGB[0] - bgRGB[0], 2) + 
+                Math.pow(targetRGB[1] - bgRGB[1], 2) + 
+                Math.pow(targetRGB[2] - bgRGB[2], 2)
             );
             const score = Math.max(0, Math.min(100, 100 - (dist / 2))).toFixed(1);
-            rankings.push({ name, score, color: colorMap[name] });
+            rankings.push({ name, score });
         }
 
         rankings.sort((a, b) => b.score - a.score);
 
-        // Рисуем мини-результат
-        const itemDiv = document.createElement('div');
-        itemDiv.style.background = "#252528";
-        itemDiv.style.margin = "10px 0";
-        itemDiv.style.padding = "10px";
-        itemDiv.style.borderRadius = "10px";
-        itemDiv.style.display = "flex";
-        itemDiv.style.alignItems = "center";
-        itemDiv.style.gap = "15px";
-
-        itemDiv.innerHTML = `
-            <img src="${foundGift.path.replace(/\\/g, '/')}" style="width:50px; height:50px; object-fit:contain; background:#000; border-radius:5px;">
-            <div style="flex:1">
-                <div style="font-weight:bold; font-size:13px;">${foundGift.name}</div>
-                <div style="font-size:11px; color:#aaa;">Ориг. фон: ${foundGift.currentColor}</div>
-                <div style="font-size:12px; color:var(--accent); margin-top:4px;">Лучшая пара: <b>${rankings[0].name}</b> (${rankings[0].score}%)</div>
+        // Создаем элемент карточки
+        const card = document.createElement('div');
+        card.className = 'result-card'; // Убедись, что у тебя есть стили для этого или добавь inline
+        card.style = "background: #252528; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #333;";
+        
+        card.innerHTML = `
+            <img src="${foundGift.path.replace(/\\/g, '/')}" style="width: 60px; height: 60px; object-fit: contain; background: #000; border-radius: 8px;">
+            <div style="flex: 1;">
+                <div style="font-weight: bold; color: #fff; font-size: 14px;">${foundGift.gift_title}</div>
+                <div style="font-size: 11px; color: #888;">Модель: ${foundGift.name} | Фон: ${foundGift.currentColor}</div>
+                <div style="margin-top: 5px; color: #00d2ff; font-size: 13px;">
+                    Лучшая пара: <b>${rankings[0].name}</b> <span style="color: #aaa;">(${rankings[0].score}%)</span>
+                </div>
             </div>
         `;
-        resultList.appendChild(itemDiv);
+        resultList.appendChild(card);
     });
 }
 
