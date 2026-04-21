@@ -197,13 +197,15 @@
 
     let giftData = {};
 
+    // Загрузка данных
     fetch('gifts_data.json')
         .then(res => res.json())
         .then(data => {
             giftData = data;
             createFilters();
             render('all');
-        });
+        })
+        .catch(err => console.error("Ошибка загрузки JSON:", err));
 
     function createFilters() {
         const filtersDiv = document.getElementById('filters');
@@ -219,52 +221,83 @@
         });
     }
 
-    function checkCompatibility() {
-    let input = document.getElementById('gift-url').value.trim();
-    if (!input) return;
-
-    let rawSearch = "";
-    // 1. Извлекаем название из ссылки
-    if (input.includes('t.me/nft/')) {
-        let lastPart = input.split('/').pop(); 
-        rawSearch = lastPart.split('-')[0]; // Получаем "EvilEye"
-    } else {
-        rawSearch = input;
+    function parseRGB(str) {
+        if (!str) return [0,0,0];
+        return str.match(/\d+/g).map(Number);
     }
 
-    // Создаем "чистый" поисковый запрос БЕЗ пробелов для сравнения
-    let cleanSearch = rawSearch.toLowerCase().replace(/\s+/g, ''); 
-    let results = [];
+    function checkCompatibility() {
+        const input = document.getElementById('gift-url').value.trim();
+        const resultList = document.getElementById('result-list');
+        const block = document.getElementById('analysis-result');
+        
+        if (!input) return;
 
-    // 2. Ищем по базе
-    for (let colorName in giftData) {
-        giftData[colorName].forEach(item => {
-            // Берем заголовок из JSON и тоже удаляем из него пробелы для теста
-            let titleInDb = (item.gift_title || "").toLowerCase().replace(/\s+/g, '');
-            let modelInDb = (item.name || "").toLowerCase().replace(/\s+/g, '');
+        // Очищаем предыдущие результаты сразу
+        resultList.innerHTML = "";
 
-            // Сравниваем "слитное" с "слитным"
-            if (titleInDb.includes(cleanSearch) || modelInDb.includes(cleanSearch)) {
-                results.push({ ...item, currentColor: colorName });
+        let rawSearch = "";
+        if (input.includes('t.me/nft/')) {
+            let lastPart = input.split('/').pop(); 
+            rawSearch = lastPart.split('-')[0]; 
+        } else {
+            rawSearch = input;
+        }
+
+        // Ключевая логика нормализации (убираем пробелы и дефисы)
+        let cleanSearch = rawSearch.toLowerCase().replace(/[\s-]/g, ''); 
+        let results = [];
+
+        for (let colorName in giftData) {
+            giftData[colorName].forEach(item => {
+                let titleInDb = (item.gift_title || "").toLowerCase().replace(/[\s-]/g, '');
+                let modelInDb = (item.name || "").toLowerCase().replace(/[\s-]/g, '');
+                
+                if (titleInDb.includes(cleanSearch) || modelInDb.includes(cleanSearch)) {
+                    results.push({ ...item, currentColor: colorName });
+                }
+            });
+        }
+
+        if (results.length === 0) {
+            block.style.display = 'none';
+            alert("Подарок '" + rawSearch + "' не найден в базе. Проверьте JSON.");
+            return;
+        }
+
+        block.style.display = 'block';
+        resultList.innerHTML = `<p style="font-size: 12px; color: #888; margin-bottom: 10px;">Найдено совпадений: ${results.length}</p>`;
+
+        results.forEach(foundGift => {
+            const targetRGB = parseRGB(colorMap[foundGift.currentColor]);
+            let rankings = [];
+            for (let name in colorMap) {
+                const bgRGB = parseRGB(colorMap[name]);
+                const dist = Math.sqrt(
+                    Math.pow(targetRGB[0] - bgRGB[0], 2) + 
+                    Math.pow(targetRGB[1] - bgRGB[1], 2) + 
+                    Math.pow(targetRGB[2] - bgRGB[2], 2)
+                );
+                const score = Math.max(0, Math.min(100, 100 - (dist / 2))).toFixed(1);
+                rankings.push({ name, score });
             }
+            rankings.sort((a, b) => b.score - a.score);
+
+            const card = document.createElement('div');
+            card.style = "background: #252528; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #333;";
+            card.innerHTML = `
+                <img src="${foundGift.path.replace(/\\/g, '/')}" style="width: 60px; height: 60px; object-fit: contain; background: #000; border-radius: 8px;">
+                <div style="flex: 1;">
+                    <div style="font-weight: bold; color: #fff; font-size: 14px;">${foundGift.gift_title || foundGift.name}</div>
+                    <div style="font-size: 11px; color: #888;">Модель: ${foundGift.name} | Фон: ${foundGift.currentColor}</div>
+                    <div style="margin-top: 5px; color: #00d2ff; font-size: 13px;">
+                        Лучшая пара: <b>${rankings[0].name}</b> <span style="color: #aaa;">(${rankings[0].score}%)</span>
+                    </div>
+                </div>
+            `;
+            resultList.appendChild(card);
         });
     }
-
-    const resultList = document.getElementById('result-list');
-    const block = document.getElementById('analysis-result');
-    
-    if (results.length === 0) {
-        alert("Подарок '" + rawSearch + "' не найден.");
-        return;
-    }
-
-    block.style.display = 'block';
-    resultList.innerHTML = `<p style="font-size: 12px; color: #888; margin-bottom: 10px;">Найдено совпадений: ${results.length}</p>`;
-
-    results.forEach(foundGift => {
-        // ... (весь твой код отрисовки карточек ниже остается без изменений)
-        const targetRGB = parseRGB(colorMap[foundGift.currentColor]);
-        // ... и так далее
 
     function render(color) {
         const container = document.getElementById('container');
@@ -273,15 +306,16 @@
             ? [].concat(...Object.values(giftData))
             : giftData[color];
 
-        // Уникальность по путям
+        // Фильтр уникальности по путям
         items = Array.from(new Map(items.map(i => [i.path, i])).values());
 
         items.forEach(item => {
             const card = document.createElement('div');
             card.className = 'card';
+            const displayName = item.gift_title || item.name;
             card.innerHTML = `
                 <img src="${item.path.replace(/\\/g, '/')}" loading="lazy">
-                <div class="info" title="${item.name}">${item.name}</div>
+                <div class="info" title="${displayName}">${displayName}</div>
             `;
             container.appendChild(card);
         });
@@ -292,6 +326,10 @@
         btn.classList.add('active');
         render(color);
     }
+
+    document.getElementById('gift-url').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkCompatibility();
+    });
 </script>
 
 </body>
