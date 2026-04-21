@@ -220,88 +220,57 @@
     }
 
     function checkCompatibility() {
-    let input = document.getElementById('gift-url').value.trim();
-    if (!input) return;
+        let input = document.getElementById('gift-url').value.trim();
+        if (!input) return;
 
-    let searchName = "";
+        let searchName = "";
 
-    // 1. Извлекаем название из ссылки или берем текст
-    if (input.includes('t.me/nft/')) {
-        // Из "https://t.me/nft/EvilEye-5729" получаем "evileye"
-        let lastPart = input.split('/').pop(); 
-        searchName = lastPart.split('-')[0].toLowerCase(); 
-    } else {
-        searchName = input.toLowerCase();
-    }
-
-    let results = [];
-
-
-    // 2. Ищем по всей базе данных
-    for (let colorName in giftData) {
-        giftData[colorName].forEach(item => {
-            // Очищаем названия от пробелов и дефисов для "мягкого" сравнения
-            let cleanSearch = searchName.replace(/[\s-]/g, '').toLowerCase();
-            
-            let title = (item.gift_title || "").replace(/[\s-]/g, '').toLowerCase();
-            let model = (item.name || "").replace(/[\s-]/g, '').toLowerCase();
-
-            // Сравниваем очищенные строки
-            if (title.includes(cleanSearch) || model.includes(cleanSearch)) {
-                results.push({ ...item, currentColor: colorName });
-            }
-        });
-    }
-
-    // 3. Вывод результатов
-    const resultList = document.getElementById('result-list');
-    const block = document.getElementById('analysis-result');
-    
-    if (results.length === 0) {
-        alert("Подарок или модель '" + searchName + "' не найдены.");
-        return;
-    }
-
-    block.style.display = 'block';
-    resultList.innerHTML = `<p style="font-size: 12px; color: #888; margin-bottom: 10px;">Найдено совпадений: ${results.length}</p>`;
-
-    // Рисуем карточку для каждого найденного совпадения
-    results.forEach(foundGift => {
-        const targetRGB = parseRGB(colorMap[foundGift.currentColor]);
-        let rankings = [];
-
-        // Считаем совместимость с 80 цветами
-        for (let name in colorMap) {
-            const bgRGB = parseRGB(colorMap[name]);
-            const dist = Math.sqrt(
-                Math.pow(targetRGB[0] - bgRGB[0], 2) + 
-                Math.pow(targetRGB[1] - bgRGB[1], 2) + 
-                Math.pow(targetRGB[2] - bgRGB[2], 2)
-            );
-            const score = Math.max(0, Math.min(100, 100 - (dist / 2))).toFixed(1);
-            rankings.push({ name, score });
+        // 1. Извлекаем название из ссылки или берем текст
+        if (input.includes('t.me/nft/')) {
+            // Берем всё что после последнего слеша
+            let lastPart = input.split('/').pop(); 
+            // Отсекаем номер после дефиса (если он есть)
+            searchName = lastPart.split('-')[0]; 
+        } else {
+            searchName = input;
         }
 
-        rankings.sort((a, b) => b.score - a.score);
+        // Ключевой момент: очищаем поисковый запрос от пробелов и дефисов СРАЗУ
+        let cleanSearch = searchName.replace(/[\s-]/g, '').toLowerCase();
+        let results = [];
 
-        // Создаем элемент карточки
-        const card = document.createElement('div');
-        card.className = 'result-card'; // Убедись, что у тебя есть стили для этого или добавь inline
-        card.style = "background: #252528; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #333;";
+        // 2. Ищем по всей базе данных
+        for (let colorName in giftData) {
+            giftData[colorName].forEach(item => {
+                // Очищаем данные из базы для сравнения
+                let title = (item.gift_title || "").replace(/[\s-]/g, '').toLowerCase();
+                let model = (item.name || "").replace(/[\s-]/g, '').toLowerCase();
+
+                // Сравниваем очищенный запрос с очищенными полями
+                if (title.includes(cleanSearch) || model.includes(cleanSearch)) {
+                    results.push({ ...item, currentColor: colorName });
+                }
+            });
+        }
+
+        // 3. Вывод результатов
+        const resultList = document.getElementById('result-list');
+        const block = document.getElementById('analysis-result');
         
-        card.innerHTML = `
-            <img src="${foundGift.path.replace(/\\/g, '/')}" style="width: 60px; height: 60px; object-fit: contain; background: #000; border-radius: 8px;">
-            <div style="flex: 1;">
-                <div style="font-weight: bold; color: #fff; font-size: 14px;">${foundGift.gift_title}</div>
-                <div style="font-size: 11px; color: #888;">Модель: ${foundGift.name} | Фон: ${foundGift.currentColor}</div>
-                <div style="margin-top: 5px; color: #00d2ff; font-size: 13px;">
-                    Лучшая пара: <b>${rankings[0].name}</b> <span style="color: #aaa;">(${rankings[0].score}%)</span>
-                </div>
-            </div>
-        `;
-        resultList.appendChild(card);
-    });
-}
+        if (results.length === 0) {
+            // Показываем то, что реально искали (без мусора)
+            alert("Подарок '" + cleanSearch + "' не найден в базе.");
+            return;
+        }
+
+        block.style.display = 'block';
+        resultList.innerHTML = `<p style="font-size: 12px; color: #888; margin-bottom: 10px;">Найдено совпадений: ${results.length}</p>`;
+
+        // Дальше отрисовка карточек (оставь как была)...
+        results.forEach(foundGift => {
+            // ... твой код отрисовки ...
+        });
+    }
 
     function displayResults(results, giftName) {
         const block = document.getElementById('analysis-result');
