@@ -220,79 +220,84 @@
     }
 
     function checkCompatibility() {
-        let input = document.getElementById('gift-url').value.trim();
-        if (!input) return;
+    let input = document.getElementById('gift-url').value.trim();
+    if (!input) return;
 
-        let searchName = "";
+    let searchName = "";
+    if (input.includes('t.me/nft/')) {
+        let lastPart = input.split('/').pop(); 
+        searchName = lastPart.split('-')[0]; 
+    } else {
+        searchName = input;
+    }
 
-        // 1. Извлекаем название из ссылки или берем текст
-        if (input.includes('t.me/nft/')) {
-            // Берем всё что после последнего слеша
-            let lastPart = input.split('/').pop(); 
-            // Отсекаем номер после дефиса (если он есть)
-            searchName = lastPart.split('-')[0]; 
-        } else {
-            searchName = input;
-        }
+    // Очищаем запрос: только буквы и цифры
+    let cleanSearch = searchName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    let results = [];
 
-        // Ключевой момент: очищаем поисковый запрос от пробелов и дефисов СРАЗУ
-        let cleanSearch = searchName.replace(/[\s-]/g, '').toLowerCase();
-        let results = [];
+    for (let colorName in giftData) {
+        giftData[colorName].forEach(item => {
+            // Очищаем все поля для сравнения
+            let title = (item.gift_title || "").replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            let model = (item.name || "").replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            let path = (item.path || "").toLowerCase();
 
-        // 2. Ищем по всей базе данных
-        for (let colorName in giftData) {
-            giftData[colorName].forEach(item => {
-                // Очищаем данные из базы для сравнения
-                let title = (item.gift_title || "").replace(/[\s-]/g, '').toLowerCase();
-                let model = (item.name || "").replace(/[\s-]/g, '').toLowerCase();
-
-                // Сравниваем очищенный запрос с очищенными полями
-                if (title.includes(cleanSearch) || model.includes(cleanSearch)) {
-                    results.push({ ...item, currentColor: colorName });
-                }
-            });
-        }
-
-        // 3. Вывод результатов
-        const resultList = document.getElementById('result-list');
-        const block = document.getElementById('analysis-result');
-        
-        if (results.length === 0) {
-            // Показываем то, что реально искали (без мусора)
-            alert("Подарок '" + cleanSearch + "' не найден в базе.");
-            return;
-        }
-
-        block.style.display = 'block';
-        resultList.innerHTML = `<p style="font-size: 12px; color: #888; margin-bottom: 10px;">Найдено совпадений: ${results.length}</p>`;
-
-        // Дальше отрисовка карточек (оставь как была)...
-        results.forEach(foundGift => {
-            // ... твой код отрисовки ...
+            // Если совпало название, модель ИЛИ если кусок ссылки есть в пути к файлу
+            if (title.includes(cleanSearch) || model.includes(cleanSearch) || path.includes(cleanSearch)) {
+                results.push({ ...item, currentColor: colorName });
+            }
         });
     }
 
-    function displayResults(results, giftName) {
-        const block = document.getElementById('analysis-result');
-        const list = document.getElementById('result-list');
-        block.style.display = 'block';
-        list.innerHTML = `<p style="color:var(--accent); font-weight:bold; margin-bottom:10px;">${giftName}</p>`;
-
-        results.forEach(res => {
-            const item = document.createElement('div');
-            item.className = 'result-item';
-            item.innerHTML = `
-                <div class="color-dot" style="background:${res.color}"></div>
-                <span>${res.name}</span>
-                <span style="margin-left:auto; color:#888;">${res.score}%</span>
-            `;
-            list.appendChild(item);
-        });
+    const resultList = document.getElementById('result-list');
+    const block = document.getElementById('analysis-result');
+    
+    if (results.length === 0) {
+        alert("Подарок '" + searchName + "' не найден. Попробуй ввести просто название (например: Evil Eye)");
+        return;
     }
 
-    function parseRGB(str) {
-        return str.match(/\d+/g).map(Number);
-    }
+    // Очищаем старые результаты перед новым поиском
+    resultList.innerHTML = "";
+    block.style.display = 'block';
+    
+    // Сортируем: сначала точные совпадения по названию
+    results.sort((a, b) => {
+        let titleA = (a.gift_title || "").toLowerCase();
+        return titleA.includes(cleanSearch) ? -1 : 1;
+    });
+
+    // Отрисовка (оставляем твою логику)
+    results.forEach(foundGift => {
+        const targetRGB = parseRGB(colorMap[foundGift.currentColor]);
+        let rankings = [];
+        for (let name in colorMap) {
+            const bgRGB = parseRGB(colorMap[name]);
+            const dist = Math.sqrt(
+                Math.pow(targetRGB[0] - bgRGB[0], 2) + 
+                Math.pow(targetRGB[1] - bgRGB[1], 2) + 
+                Math.pow(targetRGB[2] - bgRGB[2], 2)
+            );
+            const score = Math.max(0, Math.min(100, 100 - (dist / 2))).toFixed(1);
+            rankings.push({ name, score });
+        }
+        rankings.sort((a, b) => b.score - a.score);
+
+        const card = document.createElement('div');
+        card.style = "background: #252528; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #333;";
+        card.innerHTML = `
+            <img src="${foundGift.path.replace(/\\/g, '/')}" style="width: 60px; height: 60px; object-fit: contain; background: #000; border-radius: 8px;">
+            <div style="flex: 1;">
+                <div style="font-weight: bold; color: #fff; font-size: 14px;">${foundGift.gift_title || foundGift.name}</div>
+                <div style="font-size: 11px; color: #888;">Модель: ${foundGift.name} | Фон: ${foundGift.currentColor}</div>
+                <div style="margin-top: 5px; color: #00d2ff; font-size: 13px;">
+                    Лучшая пара: <b>${rankings[0].name}</b> <span style="color: #aaa;">(${rankings[0].score}%)</span>
+                </div>
+            </div>
+        `;
+        resultList.appendChild(card);
+    });
+}
 
     function render(color) {
         const container = document.getElementById('container');
