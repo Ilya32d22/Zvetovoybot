@@ -194,7 +194,30 @@
         "Purple": "rgb(153, 97, 163)", "Dark Lilac": "rgb(177, 131, 153)", "Fandango": "rgb(204, 121, 156)",
         "Mexican Pink": "rgb(225, 97, 139)", "Raspberry": "rgb(215, 125, 129)"
     };
-
+// Загрузка данных с проверкой
+fetch('gifts_data.json')
+    .then(res => {
+        if (!res.ok) throw new Error('Файл не найден или ошибка сервера');
+        return res.json();
+    })
+    .then(data => {
+        giftData = data;
+        if (Object.keys(data).length === 0) {
+            document.getElementById('container').innerHTML = "JSON пустой!";
+            return;
+        }
+        createFilters();
+        render('all');
+    })
+    .catch(err => {
+        console.error(err);
+        document.getElementById('container').innerHTML = 
+            `<div style="color: red; text-align: center; padding: 50px;">
+                <h2>Ошибка загрузки JSON</h2>
+                <p>Скорее всего, браузер блокирует локальный файл.</p>
+                <p>Попробуй запустить через <b>Live Server</b> в VS Code или загрузи файлы на хостинг (GitHub Pages).</p>
+            </div>`;
+    });
     let giftData = {};
 
     // Загрузка данных
