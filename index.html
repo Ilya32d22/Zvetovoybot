@@ -220,29 +220,50 @@
     }
 
     function checkCompatibility() {
-        const url = document.getElementById('gift-url').value;
-        if (!url) return;
-        
-        // Достаем название из ссылки (CloverPin)
-        const giftName = url.split('/').pop().split('-')[0].toLowerCase();
-        let foundGift = null;
+    let input = document.getElementById('gift-url').value.trim();
+    if (!input) return;
 
-        for (let color in giftData) {
-            let match = giftData[color].find(g => g.name.toLowerCase().includes(giftName));
-            if (match) {
-                foundGift = { ...match, currentColor: color };
-                break;
+    let searchName = "";
+
+    // 1. Парсим ввод: ссылка или просто текст
+    if (input.includes('t.me/nft/')) {
+        // Из "https://t.me/nft/CloverPin-169271" достаем "cloverpin"
+        let lastPart = input.split('/').pop(); 
+        searchName = lastPart.split('-')[0].toLowerCase(); 
+    } else {
+        searchName = input.toLowerCase();
+    }
+
+    let results = [];
+
+    // 2. Ищем по всей базе
+    for (let colorName in giftData) {
+        giftData[colorName].forEach(item => {
+            // У тебя в JSON "name": "Aetheris". Переводим в нижний регистр для сравнения.
+            if (item.name.toLowerCase() === searchName || item.name.toLowerCase().includes(searchName)) {
+                results.push({ ...item, currentColor: colorName });
             }
-        }
+        });
+    }
 
-        if (!foundGift) {
-            alert("Подарок не найден в базе данных галереи.");
-            return;
-        }
+    // 3. Вывод результатов
+    const resultList = document.getElementById('result-list');
+    const block = document.getElementById('analysis-result');
+    
+    if (results.length === 0) {
+        alert("Модель '" + searchName + "' не найдена в базе.");
+        return;
+    }
 
+    block.style.display = 'block';
+    resultList.innerHTML = `<p style="font-size:12px; color:#888;">Найдено совпадений: ${results.length}</p>`;
+
+    // Генерируем карточки для каждого найденного Phantom, Aetheris и т.д.
+    results.forEach(foundGift => {
         const targetRGB = parseRGB(colorMap[foundGift.currentColor]);
         let rankings = [];
 
+        // Считаем совместимость для конкретной находки
         for (let name in colorMap) {
             const bgRGB = parseRGB(colorMap[name]);
             const dist = Math.sqrt(
@@ -255,8 +276,28 @@
         }
 
         rankings.sort((a, b) => b.score - a.score);
-        displayResults(rankings.slice(0, 10), foundGift.name);
-    }
+
+        // Рисуем мини-результат
+        const itemDiv = document.createElement('div');
+        itemDiv.style.background = "#252528";
+        itemDiv.style.margin = "10px 0";
+        itemDiv.style.padding = "10px";
+        itemDiv.style.borderRadius = "10px";
+        itemDiv.style.display = "flex";
+        itemDiv.style.alignItems = "center";
+        itemDiv.style.gap = "15px";
+
+        itemDiv.innerHTML = `
+            <img src="${foundGift.path.replace(/\\/g, '/')}" style="width:50px; height:50px; object-fit:contain; background:#000; border-radius:5px;">
+            <div style="flex:1">
+                <div style="font-weight:bold; font-size:13px;">${foundGift.name}</div>
+                <div style="font-size:11px; color:#aaa;">Ориг. фон: ${foundGift.currentColor}</div>
+                <div style="font-size:12px; color:var(--accent); margin-top:4px;">Лучшая пара: <b>${rankings[0].name}</b> (${rankings[0].score}%)</div>
+            </div>
+        `;
+        resultList.appendChild(itemDiv);
+    });
+}
 
     function displayResults(results, giftName) {
         const block = document.getElementById('analysis-result');
